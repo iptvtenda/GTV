@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BTV IPTV Pro</title>
+
+<style>
+body{
+margin:0;
+background:#050914;
+font-family:sans-serif;
+color:white;
+text-align:center;
+}
+
+.header{
+background:#0f1628;
+padding:14px;
+font-size:22px;
+color:#4da3ff;
+font-weight:bold;
+}
+
+video{
+width:95%;
+max-width:900px;
+margin-top:10px;
+border-radius:12px;
+background:black;
+}
+
+input,select{
+padding:10px;
+margin:6px;
+border-radius:10px;
+border:none;
+width:85%;
+max-width:320px;
+background:#0f1c33;
+color:white;
+}
+
+button.back{
+background:#2e6bff;
+padding:8px 14px;
+border:none;
+border-radius:8px;
+color:white;
+margin-top:5px;
+}
+
+.channels{
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+gap:10px;
+padding:10px;
+}
+
+.channels button{
+padding:12px;
+border:none;
+border-radius:12px;
+background:#0f1c33;
+color:white;
+font-size:13px;
+}
+
+.channels button:hover{
+background:#2e6bff;
+}
+
+.loading{
+margin-top:15px;
+color:#9ecbff;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">BTV IPTV Pro</div>
+
+<video id="player" controls autoplay></video>
+
+<br>
+
+<input type="text" id="countrySearch" placeholder="🔍 جستجوی کشور">
+<select id="countrySelect"></select>
+
+<br>
+
+<button class="back" onclick="backToCountries()">🔙 بازگشت</button>
+
+<br>
+
+<input type="text" id="channelSearch" placeholder="🔍 جستجوی شبکه">
+
+<div id="loading" class="loading"></div>
+
+<div id="channels" class="channels"></div>
+
+<script>
+
+const video=document.getElementById("player")
+
+let currentUrl=""
+let freezeTimer
+let lastTime=0
+
+const FREEZE_TIME=10000
+const RELOAD_TIME=10000
+
+let allCountries=[]
+let allChannels=[]
+
+// پرچم
+function getFlag(code){
+return code.toUpperCase().replace(/./g,c=>
+String.fromCodePoint(127397+c.charCodeAt()))
+}
+
+// اسم کشور
+const regionNames=new Intl.DisplayNames(['fa'],{type:'region'})
+
+// ذخیره
+function save(key,val){
+localStorage.setItem(key,val)
+}
+function load(key){
+return localStorage.getItem(key)
+}
+
+// 🚀 لود کشورها (3 مرحله‌ای ضد خطا)
+function loadCountries(){
+
+setLoading("در حال دریافت کشورها...")
+
+// 1️⃣ API اصلی
+fetch("https://iptv-org.github.io/api/streams.json")
+.then(res=>res.json())
+.then(useData)
+
+// 2️⃣ fallback اول
+.catch(()=>{
+fetch("https://raw.githubusercontent.com/iptv-org/iptv/main/.github/streams.json")
+.then(res=>res.json())
+.then(useData)
+})
+
+// 3️⃣ fallback نهایی
+.catch(()=>{
+fetch("https://raw.githubusercontent.com/iptv-org/iptv/main/streams/index.m3u")
+.then(res=>res.text())
+.then(text=>{
+let list=text.split("\n").filter(l=>l.includes(".m3u"))
+let data=list.map(p=>"streams/"+p.trim())
+useData(data)
+})
+})
+
+// اگر همه fail شد
+.catch(()=>{
+setLoading("❌ مشکل اینترنت یا فیلتر")
+})
+
+}
+
+// پردازش داده
+function useData(data){
+
+allCountries = data.map(p=>({path:p}))
+
+buildCountryList(allCountries)
+restoreLast()
+
+setLoading("")
+}
+
+// ساخت لیست کشور
+function buildCountryList(list){
+
+const select=document.getElementById("countrySelect")
+select.innerHTML=""
+
+list.forEach(file=>{
+
+let filename=file.path.split("/").pop()
+let code=filename.replace(".m3u","").toUpperCase()
+
+let name=regionNames.of(code)||code
+let flag=getFlag(code)
+
+let url="https://iptv-org.github.io/iptv/"+filename
+
+let option=document.createElement("option")
+option.value=url
+option.textContent=`${flag} ${name}`
+
+select.appendChild(option)
+
+})
+
+}
+
+// انتخاب کشور
+document.getElementById("countrySelect").onchange=function(){
+save("country",this.value)
+loadChannels(this.value)
+}
+
+// سرچ کشور
+document.getElementById("countrySearch").oninput=function(){
+
+let val=this.value.toLowerCase()
+
+let filtered=allCountries.filter(f=>{
+let filename=f.path.split("/").pop()
+let code=filename.replace(".m3u","")
+let name=regionNames.of(code.toUpperCase())||code
+return name.toLowerCase().includes(val)
+})
+
+buildCountryList(filtered)
+
+}
+
+// لود شبکه‌ها
+function loadChannels(url){
+
+setLoading("در حال دریافت شبکه‌ها...")
+
+fetch(url+"?t="+Date.now())
+.then(res=>res.text())
+.then(text=>{
+
+let lines=text.split("\n")
+allChannels=[]
+let name=""
+
+lines.forEach(line=>{
+
+if(line.startsWith("#EXTINF")){
+name=line.split(",")[1]
+}
+else if(line.startsWith("http")){
+allChannels.push({name,url:line})
+}
+
+})
+
+buildChannels(allChannels)
+setLoading("")
+
+})
+.catch(()=>{
+setLoading("❌ خطا در دریافت شبکه‌ها")
+})
+
+}
+
+// ساخت شبکه‌ها
+function buildChannels(list){
+
+let div=document.getElementById("channels")
+div.innerHTML=""
+
+list.forEach(ch=>{
+
+let btn=document.createElement("button")
+btn.innerText=ch.name
+
+btn.onclick=()=>{
+save("channel",ch.url)
+play(ch.url)
+}
+
+div.appendChild(btn)
+
+})
+
+}
+
+// سرچ شبکه
+document.getElementById("channelSearch").oninput=function(){
+
+let val=this.value.toLowerCase()
+
+let filtered=allChannels.filter(c=>
+c.name.toLowerCase().includes(val)
+)
+
+buildChannels(filtered)
+
+}
+
+// پخش
+function play(url){
+currentUrl=url
+video.src=url
+video.play()
+freezeCheck()
+}
+
+// ریلود
+function reload(){
+video.src=currentUrl
+video.play()
+}
+
+// فریز
+function freezeCheck(){
+clearInterval(freezeTimer)
+freezeTimer=setInterval(()=>{
+if(video.currentTime===lastTime){
+reload()
+}
+lastTime=video.currentTime
+},FREEZE_TIME)
+}
+
+// ارور
+video.onerror=function(){
+setTimeout(reload,RELOAD_TIME)
+}
+
+// بازگشت
+function backToCountries(){
+document.getElementById("channels").innerHTML=""
+}
+
+// لودینگ
+function setLoading(txt){
+document.getElementById("loading").innerText=txt
+}
+
+// بازیابی
+function restoreLast(){
+
+let c=load("country")
+let ch=load("channel")
+
+if(c){
+document.getElementById("countrySelect").value=c
+loadChannels(c)
+
+setTimeout(()=>{
+if(ch){
+play(ch)
+}
+},1500)
+
+}
+
+}
+
+// شروع
+window.onload=function(){
+loadCountries()
+}
+
+</script>
+
+</body>
+</html>
