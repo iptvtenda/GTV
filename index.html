@@ -136,33 +136,43 @@ function loadCountries(){
 
 setLoading("در حال دریافت کشورها...")
 
-// 1️⃣ API اصلی
-fetch("https://iptv-org.github.io/api/streams.json")
-.then(res=>res.json())
-.then(useData)
-
-// 2️⃣ fallback اول
-.catch(()=>{
-fetch("https://raw.githubusercontent.com/iptv-org/iptv/main/.github/streams.json")
-.then(res=>res.json())
-.then(useData)
-})
-
-// 3️⃣ fallback نهایی
-.catch(()=>{
-fetch("https://raw.githubusercontent.com/iptv-org/iptv/main/streams/index.m3u")
+fetch("https://iptv-org.github.io/iptv/index.country.m3u")
 .then(res=>res.text())
 .then(text=>{
-let list=text.split("\n").filter(l=>l.includes(".m3u"))
-let data=list.map(p=>"streams/"+p.trim())
-useData(data)
-})
+
+let lines = text.split("\n")
+
+let countriesMap = {}
+
+lines.forEach(line=>{
+
+if(line.includes("group-title")){
+
+let name = line.split('group-title="')[1]?.split('"')[0]
+let url = ""
+
+countriesMap[name] = true
+
+}
+
 })
 
-// اگر همه fail شد
-.catch(()=>{
-setLoading("❌ مشکل اینترنت یا فیلتر")
+  
+allCountries = Object.keys(countriesMap).map(name=>({
+name,
+url: "https://iptv-org.github.io/iptv/countries/"+name.toLowerCase()+".m3u"
+}))
+
+buildCountryList2(allCountries)
+
+setLoading("")
+
 })
+.catch(()=>{
+setLoading("❌ خطا در دریافت کشورها")
+})
+
+}
 
 }
 
@@ -224,7 +234,22 @@ return name.toLowerCase().includes(val)
 buildCountryList(filtered)
 
 }
+function buildCountryList2(list){
 
+const select=document.getElementById("countrySelect")
+select.innerHTML=""
+
+list.forEach(c=>{
+
+let option=document.createElement("option")
+option.value=c.url
+option.textContent="🌍 "+c.name
+
+select.appendChild(option)
+
+})
+
+}
 // لود شبکه‌ها
 function loadChannels(url){
 function fetchWithTimeout(url, timeout = 8000) {
