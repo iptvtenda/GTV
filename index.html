@@ -228,35 +228,53 @@ buildCountryList(filtered)
 // لود شبکه‌ها
 function loadChannels(url){
 
-setLoading("در حال دریافت شبکه‌ها...")
-
-fetch(url+"?t="+Date.now())
-.then(res=>res.text())
-.then(text=>{
-
-let lines=text.split("\n")
-allChannels=[]
-let name=""
-
-lines.forEach(line=>{
-
-if(line.startsWith("#EXTINF")){
-name=line.split(",")[1]
-}
-else if(line.startsWith("http")){
-allChannels.push({name,url:line})
+sssss
+function fetchWithTimeout(url, timeout = 8000) {
+  return Promise.race([
+    fetch(url),
+    new Promise((_, reject) =>
+      setTimeout(() => reject("timeout"), timeout)
+    )
+  ]);
 }
 
-})
+function loadCountries(){
 
-buildChannels(allChannels)
-setLoading("")
+setLoading("در حال دریافت کشورها...")
 
-})
-.catch(()=>{
-setLoading("❌ خطا در دریافت شبکه‌ها")
-})
+const sources = [
+  "https://iptv-org.github.io/api/streams.json",
+  "https://raw.githubusercontent.com/iptv-org/iptv/main/.github/streams.json",
+  "https://cdn.jsdelivr.net/gh/iptv-org/iptv@main/.github/streams.json"
+];
 
+let done = false;
+
+sources.forEach(src => {
+
+  fetchWithTimeout(src)
+  .then(res => res.json())
+  .then(data => {
+
+    if(done) return;
+    done = true;
+
+    allCountries = data.map(p=>({path:p}))
+    buildCountryList(allCountries)
+    restoreLast()
+    setLoading("")
+
+  })
+  .catch(()=>{})
+
+});
+
+// اگر هیچکدوم جواب نداد
+setTimeout(()=>{
+  if(!done){
+    setLoading("❌ مشکل اینترنت یا فیلتر")
+  }
+},9000)
 }
 
 // ساخت شبکه‌ها
