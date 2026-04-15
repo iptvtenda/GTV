@@ -1,234 +1,391 @@
 <!DOCTYPE html>
-<html lang="fa">
+<html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BTV IPTV</title>
+<title>GTV 8.0.0</title>
 
 <style>
 body{
-margin:0;
-background:#050914;
-font-family:sans-serif;
-color:white;
-text-align:center;
+    margin:0;
+    background:#050914;
+    font-family:sans-serif;
+    color:white;
+    text-align:center;
 }
 
 .header{
-background:#0f1628;
-padding:14px;
-font-size:22px;
-color:#4da3ff;
+    background:#0f1628;
+    padding:14px;
+    font-size:22px;
+    color:#4da3ff;
+    font-weight:bold;
 }
 
 video{
-width:95%;
-max-width:900px;
-margin-top:10px;
-border-radius:12px;
-background:black;
+    width:95%;
+    max-width:900px;
+    margin-top:10px;
+    border-radius:12px;
+    background:black;
+}
+
+.controls{
+    margin-top:10px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+}
+
+.control-row{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:8px;
+    width:100%;
 }
 
 input,select{
-padding:10px;
-margin:6px;
-border-radius:10px;
-border:none;
-width:85%;
-max-width:320px;
-background:#0f1c33;
-color:white;
-}
-
-.channels{
-display:grid;
-grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
-gap:10px;
-padding:10px;
-}
-
-.channels button{
-padding:12px;
-border:none;
-border-radius:12px;
-background:#0f1c33;
-color:white;
-}
-
-.channels button:hover{
-background:#2e6bff;
+    padding:10px;
+    border-radius:10px;
+    border:none;
+    min-width:140px;
+    max-width:220px;
+    background:#0f1c33;
+    color:white;
 }
 
 .loading{
-margin-top:10px;
-color:#9ecbff;
+    color:#9ecbff;
 }
 </style>
 </head>
 
 <body>
 
-<div class="header">BTV IPTV</div>
+<div class="header">GTV V8.0.0</div>
 
-<video id="player" controls autoplay></video>
+<video id="player" controls autoplay muted></video>
 
-<br>
+<div class="controls">
 
-<input type="text" id="countrySearch" placeholder="🔍 جستجوی کشور">
-<select id="countrySelect"></select>
+    <div class="control-row">
+        <select id="countrySelect"></select>
+        <input type="text" id="countrySearch" placeholder="🔍 جستجوی کشور">
+    </div>
 
-<br>
+    <div class="control-row">
+        <select id="channelSelectDropdown"></select>
+        <input type="text" id="channelSearch" placeholder="🔍 جستجوی کانال">
+    </div>
 
-<input type="text" id="channelSearch" placeholder="🔍 جستجوی شبکه">
+    <div id="loading" class="loading"></div>
 
-<div id="loading" class="loading"></div>
-
-<div id="channels" class="channels"></div>
+</div>
 
 <script>
 
-const video=document.getElementById("player")
+// ========= کشورها =========
+const countryMeta = {
+"ir":{name:"ایران",flag:"🇮🇷"},
+"af":{name:"افغانستان",flag:"🇦🇫"},
+"al":{name:"آلبانی",flag:"🇦🇱"},
+"de":{name:"آلمان",flag:"🇩🇪"},
+"ad":{name:"آندورا",flag:"🇦🇩"},
+"ao":{name:"آنگولا",flag:"🇦🇴"},
+"ai":{name:"آنگویلا",flag:"🇦🇮"},
+"ag":{name:"آنتیگوا و باربودا",flag:"🇦🇬"},
+"ar":{name:"آرژانتین",flag:"🇦🇷"},
+"am":{name:"ارمنستان",flag:"🇦🇲"},
+"aw":{name:"آروبا",flag:"🇦🇼"},
+"au":{name:"استرالیا",flag:"🇦🇺"},
+"at":{name:"اتریش",flag:"🇦🇹"},
+"az":{name:"آذربایجان",flag:"🇦🇿"},
+"ec":{name:"اکوادور",flag:"🇪🇨"},
+"et":{name:"اتیوپی",flag:"🇪🇹"},
+"er":{name:"اریتره",flag:"🇪🇷"},
+"uz":{name:"ازبکستان",flag:"🇺🇿"},
+"es":{name:"اسپانیا",flag:"🇪🇸"},
+"ee":{name:"استونی",flag:"🇪🇪"},
+"il":{name:"اسرائیل",flag:"🇮🇱"},
+"sk":{name:"اسلواکی",flag:"🇸🇰"},
+"si":{name:"اسلوونی",flag:"🇸🇮"},
+"id":{name:"اندونزی",flag:"🇮🇩"},
+"gb":{name:"انگلیس",flag:"🇬🇧"},
+"ie":{name:"ایرلند",flag:"🇮🇪"},
+"is":{name:"ایسلند",flag:"🇮🇸"},
+"it":{name:"ایتالیا",flag:"🇮🇹"},
+"iq":{name:"عراق",flag:"🇮🇶"},
+"om":{name:"عمان",flag:"🇴🇲"},
+"ae":{name:"امارات",flag:"🇦🇪"},
+"us":{name:"آمریکا",flag:"🇺🇸"},
 
-let allCountries=[]
-let allChannels=[]
+"bs":{name:"باهاما",flag:"🇧🇸"},
+"bh":{name:"بحرین",flag:"🇧🇭"},
+"bd":{name:"بنگلادش",flag:"🇧🇩"},
+"bb":{name:"باربادوس",flag:"🇧🇧"},
+"br":{name:"برزیل",flag:"🇧🇷"},
+"bn":{name:"برونئی",flag:"🇧🇳"},
+"bg":{name:"بلغارستان",flag:"🇧🇬"},
+"be":{name:"بلژیک",flag:"🇧🇪"},
+"bz":{name:"بلیز",flag:"🇧🇿"},
+"bj":{name:"بنین",flag:"🇧🇯"},
+"bt":{name:"بوتان",flag:"🇧🇹"},
+"bw":{name:"بوتسوانا",flag:"🇧🇼"},
+"bo":{name:"بولیوی",flag:"🇧🇴"},
+"ba":{name:"بوسنی و هرزگوین",flag:"🇧🇦"},
 
-// ذخیره
-function save(k,v){localStorage.setItem(k,v)}
-function load(k){return localStorage.getItem(k)}
+"tj":{name:"تاجیکستان",flag:"🇹🇯"},
+"tw":{name:"تایوان",flag:"🇹🇼"},
+"th":{name:"تایلند",flag:"🇹🇭"},
+"tr":{name:"ترکیه",flag:"🇹🇷"},
+"tm":{name:"ترکمنستان",flag:"🇹🇲"},
+"tn":{name:"تونس",flag:"🇹🇳"},
 
-// 🚀 لود کشورها (روش پایدار)
+"jp":{name:"ژاپن",flag:"🇯🇵"},
+
+"cn":{name:"چین",flag:"🇨🇳"},
+"td":{name:"چاد",flag:"🇹🇩"},
+"cz":{name:"چک",flag:"🇨🇿"},
+
+"dk":{name:"دانمارک",flag:"🇩🇰"},
+"dj":{name:"جیبوتی",flag:"🇩🇯"},
+"dm":{name:"دومینیکا",flag:"🇩🇲"},
+"do":{name:"جمهوری دومینیکن",flag:"🇩🇴"},
+
+"ru":{name:"روسیه",flag:"🇷🇺"},
+"ro":{name:"رومانی",flag:"🇷🇴"},
+
+"lk":{name:"سریلانکا",flag:"🇱🇰"},
+"sg":{name:"سنگاپور",flag:"🇸🇬"},
+"se":{name:"سوئد",flag:"🇸🇪"},
+"ch":{name:"سوئیس",flag:"🇨🇭"},
+"sd":{name:"سودان",flag:"🇸🇩"},
+"sy":{name:"سوریه",flag:"🇸🇾"},
+"so":{name:"سومالی",flag:"🇸🇴"},
+
+"sa":{name:"عربستان سعودی",flag:"🇸🇦"},
+
+"fr":{name:"فرانسه",flag:"🇫🇷"},
+"fi":{name:"فنلاند",flag:"🇫🇮"},
+
+"qa":{name:"قطر",flag:"🇶🇦"},
+
+"kz":{name:"قزاقستان",flag:"🇰🇿"},
+"kg":{name:"قرقیزستان",flag:"🇰🇬"},
+"ke":{name:"کنیا",flag:"🇰🇪"},
+"kr":{name:"کره جنوبی",flag:"🇰🇷"},
+"kp":{name:"کره شمالی",flag:"🇰🇵"},
+"kw":{name:"کویت",flag:"🇰🇼"},
+
+"lv":{name:"لتونی",flag:"🇱🇻"},
+"la":{name:"لائوس",flag:"🇱🇦"},
+"lb":{name:"لبنان",flag:"🇱🇧"},
+"lt":{name:"لیتوانی",flag:"🇱🇹"},
+"ly":{name:"لیبی",flag:"🇱🇾"},
+"lu":{name:"لوکزامبورگ",flag:"🇱🇺"},
+
+"my":{name:"مالزی",flag:"🇲🇾"},
+"mv":{name:"مالدیو",flag:"🇲🇻"},
+"mt":{name:"مالت",flag:"🇲🇹"},
+"ml":{name:"مالی",flag:"🇲🇱"},
+"hu":{name:"مجارستان",flag:"🇭🇺"},
+"eg":{name:"مصر",flag:"🇪🇬"},
+"mx":{name:"مکزیک",flag:"🇲🇽"},
+"ma":{name:"مراکش",flag:"🇲🇦"},
+"mn":{name:"مغولستان",flag:"🇲🇳"},
+
+"np":{name:"نپال",flag:"🇳🇵"},
+"no":{name:"نروژ",flag:"🇳🇴"},
+"ne":{name:"نیجر",flag:"🇳🇪"},
+"ng":{name:"نیجریه",flag:"🇳🇬"},
+"ni":{name:"نیکاراگوئه",flag:"🇳🇮"},
+"nz":{name:"نیوزیلند",flag:"🇳🇿"},
+
+"nl":{name:"هلند",flag:"🇳🇱"},
+"hn":{name:"هندوراس",flag:"🇭🇳"},
+"in":{name:"هند",flag:"🇮🇳"},
+
+"ve":{name:"ونزوئلا",flag:"🇻🇪"},
+"vn":{name:"ویتنام",flag:"🇻🇳"},
+
+"ye":{name:"یمن",flag:"🇾🇪"}
+
+};
+
+// ========= متغیرها =========
+const video = document.getElementById("player");
+let allCountries = [];
+let allChannels = [];
+let currentUrl = "";
+
+// ========= ابزار =========
+function buildRawUrl(code){
+    return `https://raw.githubusercontent.com/iptv-org/iptv/master/streams/${code}.m3u`;
+}
+
+// 🔥 سرچ هوشمند
+function smartSearch(list, term){
+
+    term = term.toLowerCase().trim();
+
+    return list
+        .map(item => {
+
+            const name = (item.name || "").toLowerCase();
+
+            let score = 0;
+
+            if(name.startsWith(term)) score = 3;
+            else if(name.includes(term)) score = 2;
+
+            return {...item, score};
+
+        })
+        .filter(i => i.score > 0)
+        .sort((a,b)=> b.score - a.score);
+}
+
+// ========= لود کشور =========
 function loadCountries(){
 
-setLoading("در حال دریافت کشورها...")
+    allCountries = Object.entries(countryMeta).map(([code,info])=>({
+        code,
+        name:info.name,
+        flag:info.flag,
+        url:buildRawUrl(code)
+    }));
 
-fetch("https://iptv-org.github.io/iptv/index.country.m3u")
-.then(res=>res.text())
-.then(text=>{
-
-let lines=text.split("\n")
-let map={}
-
-lines.forEach(line=>{
-if(line.includes('group-title="')){
-let name=line.split('group-title="')[1]?.split('"')[0]
-if(name) map[name]=true
-}
-})
-
-allCountries = Object.keys(map).map(name=>({
-name,
-url:"https://iptv-org.github.io/iptv/countries/"+name.toLowerCase()+".m3u"
-}))
-
-buildCountryList(allCountries)
-
-setLoading("")
-
-})
-.catch(()=>{
-setLoading("❌ خطا در دریافت کشورها")
-})
-
+    renderCountries(allCountries);
 }
 
-// ساخت لیست کشور
-function buildCountryList(list){
+// ========= نمایش کشور =========
+function renderCountries(list){
 
-const select=document.getElementById("countrySelect")
-select.innerHTML=""
+    const sel = document.getElementById("countrySelect");
+    sel.innerHTML = "";
 
-list.forEach(c=>{
-let option=document.createElement("option")
-option.value=c.url
-option.textContent="🌍 "+c.name
-select.appendChild(option)
-})
+    list.forEach(c=>{
+        const opt = document.createElement("option");
+        opt.value = c.code;
+        opt.textContent = `${c.flag} ${c.name}`;
+        sel.appendChild(opt);
+    });
 
+    if(list.length){
+        sel.value = list[0].code;
+        loadCountryChannels(list[0].code);
+    }
 }
 
-// انتخاب کشور
-document.getElementById("countrySelect").onchange=function(){
-save("country",this.value)
-loadChannels(this.value)
+// ========= لود کانال =========
+async function loadCountryChannels(code){
+
+    const c = allCountries.find(x=>x.code===code);
+    const loading = document.getElementById("loading");
+
+    loading.textContent = "در حال لود کانال‌ها...";
+
+    try{
+        const res = await fetch(c.url);
+        const text = await res.text();
+
+        const lines = text.split("\n");
+
+        const channels=[];
+        let title="";
+
+        for(let i=0;i<lines.length;i++){
+            let ln = lines[i].trim();
+
+            if(ln.startsWith("#EXTINF")){
+                title = ln.split(",")[1] || "";
+            }
+            else if(ln && !ln.startsWith("#")){
+                channels.push({name:title,url:ln});
+            }
+        }
+
+        allChannels = channels;
+        renderChannels(channels);
+
+        loading.textContent = channels.length + " کانال";
+
+    }catch(e){
+        loading.textContent = "خطا در لود";
+    }
 }
 
-// سرچ کشور
-document.getElementById("countrySearch").oninput=function(){
-let v=this.value.toLowerCase()
-let f=allCountries.filter(c=>c.name.toLowerCase().includes(v))
-buildCountryList(f)
+// ========= نمایش کانال =========
+function renderChannels(list){
+
+    const sel = document.getElementById("channelSelectDropdown");
+    sel.innerHTML = "";
+
+    list.forEach(ch=>{
+        const opt = document.createElement("option");
+        opt.value = ch.url;
+        opt.textContent = ch.name || "بدون نام";
+        sel.appendChild(opt);
+    });
+
+    if(list.length){
+        playChannel(list[0].url);
+    }
 }
 
-// لود شبکه‌ها
-function loadChannels(url){
+// ========= پخش =========
+function playChannel(url){
 
-setLoading("در حال دریافت شبکه‌ها...")
+    if(!url) return;
 
-fetch(url)
-.then(res=>res.text())
-.then(text=>{
+    currentUrl = url;
 
-let lines=text.split("\n")
-allChannels=[]
-let name=""
-
-lines.forEach(line=>{
-if(line.startsWith("#EXTINF")){
-name=line.split(",")[1]
-}
-else if(line.startsWith("http")){
-allChannels.push({name,url:line})
-}
-})
-
-buildChannels(allChannels)
-setLoading("")
-
-})
-
+    video.src = url;
+    video.play().catch(()=>{});
 }
 
-// ساخت شبکه‌ها
-function buildChannels(list){
+// ========= EVENT ها =========
 
-let div=document.getElementById("channels")
-div.innerHTML=""
+// انتخاب کانال
+document.getElementById("channelSelectDropdown").onchange = function(){
+    playChannel(this.value);
+};
 
-list.forEach(ch=>{
-let btn=document.createElement("button")
-btn.innerText=ch.name
+// تغییر کشور
+document.getElementById("countrySelect").onchange = function(){
+    loadCountryChannels(this.value);
+};
 
-btn.onclick=()=>{
-save("channel",ch.url)
-play(ch.url)
-}
+// 🔥 سرچ کانال
+document.getElementById("channelSearch").oninput = function(){
 
-div.appendChild(btn)
-})
+    const term = this.value;
 
-}
+    if(!term){
+        renderChannels(allChannels);
+        return;
+    }
 
-// سرچ شبکه
-document.getElementById("channelSearch").oninput=function(){
-let v=this.value.toLowerCase()
-let f=allChannels.filter(c=>c.name.toLowerCase().includes(v))
-buildChannels(f)
-}
+    const result = smartSearch(allChannels, term);
+    renderChannels(result);
+};
 
-// پخش
-function play(url){
-video.src=url
-video.play()
-}
+// 🔥 سرچ کشور
+document.getElementById("countrySearch").oninput = function(){
 
-// لود اولیه
-window.onload=function(){
-loadCountries()
-}
+    const term = this.value;
 
-function setLoading(t){
-document.getElementById("loading").innerText=t
-}
+    const list = term
+        ? smartSearch(allCountries, term)
+        : allCountries;
+
+    renderCountries(list);
+};
+
+// ========= شروع =========
+window.onload = loadCountries;
 
 </script>
 
